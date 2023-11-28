@@ -13,7 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_compile_options(-DLOCAL)
 
 set(WarningOptions
--O3
+# -O3
 # -Wall -Wextra -pedantic
 # -Wshadow -Wformat=2 -Wfloat-equal -Wcast-qual -Wcast-align
 # -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC

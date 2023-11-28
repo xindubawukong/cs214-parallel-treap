@@ -3,16 +3,18 @@
 #include "pam/pam.h"
 #include "pam/treap.h"
 #include "parlay/parallel.h"
-#include "treap.h"
+#include "treap2.h"
 
 using namespace std;
 
 struct Info {
-  int val, sum;
-  Info(int val_ = 0) : val(val_), sum(0) {}
-  bool operator<(const Info& info) const { return val < info.val; }
+  using key_t = int;
+  key_t key;
+  long long val, sum;
+  Info(int key_ = 0) : key(key_), val(0), sum(0) {}
+  static bool cmp(const key_t& a, const key_t& b) { return a < b; }
   void Update(Info* left, Info* right) {
-    sum = val;
+    sum = key;
     if (left) sum += left->sum;
     if (right) sum += right->sum;
   }
@@ -31,6 +33,8 @@ struct entry {
   }
 };
 
+std::mt19937 rng(0);
+
 int main() {
   using map_t = aug_map<entry, treap<entry>>;
   map_t a;
@@ -40,13 +44,24 @@ int main() {
                                        replace);
   cout << a.aug_val() << endl;
 
-  Treap<Info, true> treap;
-  treap.Insert(Info(2));
-  treap.Insert(Info(3));
-  treap.Insert(Info(5));
-  treap.Insert(Info(2));
-  treap.Traverse(treap.root, [&](Info* info) { cout << info->val << '\n'; });
-  cout << treap.root->sum << endl;
+  vector<pair<int, long long>> tt(10);
+  for (int i = 0; i < 10; i++) {
+    tt[i].first = i;
+    tt[i].second = rng() % 100;
+  }
+  Treap2<Info> treap;
+  cout << "before build" << endl;
+  treap.root = treap.BuildTree(0, 9, [&](int i, Info* info) {
+    info->key = tt[i].first;
+    info->val = tt[i].second;
+  });
+  cout << "after build" << endl;
+  int cnt = 0;
+  treap.Traverse(treap.root, [&](Info* info) {
+    cnt++;
+    cout << info->key << ' ' << info->val << '\n';
+  });
+  cout << "cnt: " << cnt << endl;
 
   return 0;
 }
