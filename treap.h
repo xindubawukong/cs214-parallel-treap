@@ -6,6 +6,7 @@
 #include <tuple>
 #include <vector>
 
+#include "parlay/alloc.h"
 #include "parlay/utilities.h"
 
 /*
@@ -51,7 +52,6 @@ struct Treap {
       priority = parlay::hash64((size_t)this);
       if constexpr (persist) this->ts = ts_;
     }
-    // when copying a node, must be in persist mode
     Node(Node* x, size_t ts) {
       *this = *x;
       if constexpr (persist) this->ts = ts;
@@ -59,8 +59,10 @@ struct Treap {
     void Set(const Info& info) { (Info&)(*this) = info; }
   };
 
-  Node* Create() { return new Node(ts); }
-  Node* Copy(Node* x) { return new Node(x, ts); }
+  using allocator = parlay::type_allocator<Node>;
+
+  Node* Create() { return allocator::create(ts); }
+  Node* Copy(Node* x) { return allocator::create(x, ts); }
 
   Node* root;
   size_t ts;  // plus version if persistence is wanted
@@ -75,8 +77,8 @@ struct Treap {
     if (!x) return y ? Update(y) : nullptr;
     if (!y) return Update(x);
     if constexpr (persist) {
-      if (x->ts != ts) x = new Node(x, ts);
-      if (y->ts != ts) y = new Node(y, ts);
+      if (x->ts != ts) x = Copy(x);
+      if (y->ts != ts) y = Copy(y);
     }
     if (x->priority >= y->priority) {
       x->rch = Join(x->rch, y);
@@ -93,9 +95,9 @@ struct Treap {
     if (!z) return Join(x, y);
     assert(!y->lch && !y->rch);  // y must be single node
     if constexpr (persist) {
-      if (x->ts != ts) x = new Node(x, ts);
-      if (y->ts != ts) y = new Node(y, ts);
-      if (z->ts != ts) z = new Node(z, ts);
+      if (x->ts != ts) x = Copy(x);
+      if (y->ts != ts) y = Copy(y);
+      if (z->ts != ts) z = Copy(z);
     }
     if (x->priority >= y->priority && x->priority >= z->priority) {
       x->rch = Join(x->rch, y, z);
@@ -117,14 +119,14 @@ struct Treap {
   std::tuple<Node*, Node*, Node*> Split(Node* x, Cmp cmp) {
     if (!x) return {nullptr, nullptr, nullptr};
     if constexpr (persist) {
-      if (x->ts != ts) x = new Node(x, ts);
+      if (x->ts != ts) x = Copy(x);
     }
     auto d = cmp(x);
     if (d == 0) {
       auto l = x->lch, r = x->rch;
       if constexpr (persist) {
-        if (l && l->ts != ts) l = new Node(l, ts);
-        if (r && r->ts != ts) r = new Node(r, ts);
+        if (l && l->ts != ts) l = Copy(l);
+        if (r && r->ts != ts) r = Copy(r);
       }
       x->lch = x->rch = nullptr;
       return {l, Update(x), r};
@@ -171,6 +173,33 @@ struct Treap {
     bool res = t2;
     if (t2) delete t2;
     return res;
+  }
+
+  Node* Find(const Info& info) {
+    Node* x = root;
+    while (x) {
+      if (info < (Info)*x) x = x->lch;
+      else if ((Info)*x < info) x = x->rch;
+      else break;
+    }
+    return x;
+  }
+
+  size_t Rank(const Info& info) {
+    Node* x = root;
+    size_t less = 0;
+    while (x) {
+      if (info < (Info)*x) x = x->lch;
+      else if ((Info)*x < info) {
+        less += x->lch ? x->lch->size : 0;
+        less++;
+        x = x->rch;
+      } else {
+        less += x->lch ? x->lch->size : 0;
+        break;
+      }
+    }
+    return less + 1;
   }
 };
 
