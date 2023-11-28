@@ -13,7 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_compile_options(-DLOCAL)
 
 set(WarningOptions
--O2
+-O3
 # -Wall -Wextra -pedantic
 # -Wshadow -Wformat=2 -Wfloat-equal -Wcast-qual -Wcast-align
 # -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC
@@ -26,7 +26,7 @@ add_compile_options(${WarningOptions})
 add_link_options(${WarningOptions})
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/parlaylib/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/PAM/include)
 
-add_subdirectory(parlaylib)
-
-add_executable(main  main.cpp)
+add_executable(main main.cpp)

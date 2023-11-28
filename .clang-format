@@ -1,0 +1,4 @@
+BasedOnStyle: Google
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+PointerAlignment: Left
+ReferenceAlignment: Left
