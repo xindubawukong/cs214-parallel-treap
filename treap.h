@@ -7,11 +7,18 @@
 #include <vector>
 
 #include "parlay/alloc.h"
+#include "parlay/parallel.h"
+#include "parlay/primitives.h"
 #include "parlay/utilities.h"
+#include "utils.h"
 
 /*
 struct Info {
+  using key_t = size_t;
+  key_t key;
+  // other values you want to maintain
   Info() {}
+  static bool cmp(const key_t& a, const key_t& b) {}
   void Update(Info* left, Info* right) {}
 };
 */
@@ -32,55 +39,37 @@ struct KthCmp {
   }
 };
 
-template <bool>
-struct TreapNodeBase {};
-template <>
-struct TreapNodeBase<false> {};
-template <>
-struct TreapNodeBase<true> {
-  size_t ts;
-};
-
-template <typename Info, bool persist = false>
+template <typename Info>
 struct Treap {
   using info_t = Info;
   using key_t = Info::key_t;
 
-  struct Node : public Info, public TreapNodeBase<persist> {
+  struct Node : public Info {
     size_t priority;
+    size_t size;
     Node *lch, *rch;
-    Node(size_t ts_ = 0) : lch(nullptr), rch(nullptr) {
+    Node() : size(1), lch(nullptr), rch(nullptr) {
       priority = parlay::hash64((size_t)this);
-      if constexpr (persist) this->ts = ts_;
-    }
-    Node(Node* x, size_t ts) {
-      *this = *x;
-      if constexpr (persist) this->ts = ts;
     }
     void Set(const Info& info) { (Info&)(*this) = info; }
   };
 
   using allocator = parlay::type_allocator<Node>;
 
-  Node* Create() { return allocator::create(ts); }
-  Node* Copy(Node* x) { return allocator::create(x, ts); }
+  Node* Create() { return allocator::create(); }
 
   Node* root;
-  size_t ts;  // plus version if persistence is wanted
-  Treap() : root(nullptr), ts(0) {}
+  Treap() : root(nullptr) {}
 
   Node* Update(Node* x) {
     x->Update(x->lch, x->rch);
+    x->size = 1 + (x->lch ? x->lch->size : 0) + (x->rch ? x->rch->size : 0);
     return x;
   }
 
   Node* Join(Node* x, Node* y) {
     if (!x) return y ? Update(y) : nullptr;
     if (!y) return Update(x);
-    if constexpr (persist) {
-      if (x->ts != ts) x = Copy(x);
-      if (y->ts != ts) y = Copy(y);
-    }
     if (x->priority >= y->priority) {
       x->rch = Join(x->rch, y);
       return Update(x);
@@ -95,11 +84,6 @@ struct Treap {
     if (!y) return Join(x, z);
     if (!z) return Join(x, y);
     assert(!y->lch && !y->rch);  // y must be single node
-    if constexpr (persist) {
-      if (x->ts != ts) x = Copy(x);
-      if (y->ts != ts) y = Copy(y);
-      if (z->ts != ts) z = Copy(z);
-    }
     if (x->priority >= y->priority && x->priority >= z->priority) {
       x->rch = Join(x->rch, y, z);
       return Update(x);
@@ -119,16 +103,9 @@ struct Treap {
   template <typename Cmp>
   std::tuple<Node*, Node*, Node*> Split(Node* x, Cmp cmp) {
     if (!x) return {nullptr, nullptr, nullptr};
-    if constexpr (persist) {
-      if (x->ts != ts) x = Copy(x);
-    }
     auto d = cmp(x);
     if (d == 0) {
       auto l = x->lch, r = x->rch;
-      if constexpr (persist) {
-        if (l && l->ts != ts) l = Copy(l);
-        if (r && r->ts != ts) r = Copy(r);
-      }
       x->lch = x->rch = nullptr;
       return {l, Update(x), r};
     } else if (d < 0) {
@@ -143,7 +120,7 @@ struct Treap {
   }
 
   auto Split(Node* x, const key_t& key) {
-    return Split(root, [&](Info* t) {
+    return Split(x, [&](Info* t) {
       if (Info::cmp(key, t->key)) return -1;
       if (Info::cmp(t->key, key)) return 1;
       return 0;
@@ -160,10 +137,21 @@ struct Treap {
     Traverse(x->rch, f);
   }
 
+  template <typename F>
+  Node* BuildTree(size_t l, size_t r, F f) {
+    if (l > r) return nullptr;
+    size_t mid = (l + r) / 2;
+    Node* x = Create();
+    f(mid, x);
+    if (l < mid) x->lch = BuildTree(l, mid - 1, f);
+    if (mid < r) x->rch = BuildTree(mid + 1, r, f);
+    return Update(x);
+  }
+
   void Insert(const Info& info) {
     Node* x = Create();
     x->Set(info);
-    auto [t1, t2, t3] = Split(root, info);
+    auto [t1, t2, t3] = Split(root, info.key);
     if (!t2) t2 = x;
     root = Join(t1, t2, t3);
   }
@@ -172,7 +160,7 @@ struct Treap {
     auto [t1, t2, t3] = Split(root, key);
     root = Join(t1, t3);
     bool res = t2;
-    if (t2) delete t2;
+    if (t2) allocator::free(t2);
     return res;
   }
 
@@ -203,18 +191,49 @@ struct Treap {
     return less + 1;
   }
 
+  size_t dbg(Node* x) { return x ? x->size : 0; }
+
   Node* Union(Node* x, Node* y) {
     if (!x) return y;
     if (!y) return x;
-    if constexpr (persist) {
-      if (x->ts != ts) x = Copy(x);
-      if (y->ts != ts) y = Copy(y);
-    }
+    bool parallel = x->size > 100 && y->size > 100;
     auto [t1, t2, t3] = Split(y, x->key);
-    auto left = Union(x->lch, t1);
-    auto right = Union(x->rch, t3);
+    Node* left;
+    Node* right;
+    conditional_par_do(
+        parallel, [&]() { left = Union(x->lch, t1); },
+        [&]() { right = Union(x->rch, t3); });
     x->lch = x->rch = nullptr;
-    return Join(left, right, Update(x));
+    return Join(left, Update(x), right);
+  }
+
+  Node* Intersect(Node* x, Node* y) {
+    if (!x) return nullptr;
+    if (!y) return nullptr;
+    bool parallel = x->size > 100 && y->size > 100;
+    auto [t1, t2, t3] = Split(y, x->key);
+    Node* left;
+    Node* right;
+    conditional_par_do(
+        parallel, [&]() { left = Intersect(x->lch, t1); },
+        [&]() { right = Intersect(x->rch, t3); });
+    x->lch = x->rch = nullptr;
+    if (t2) return Join(left, Update(x), right);
+    else return Join(left, right);
+  }
+
+  template <typename F>
+  Node* Filter(Node* x, F f) {
+    if (!x) return nullptr;
+    bool parallel = x->size > 100;
+    Node* left;
+    Node* right;
+    conditional_par_do(
+        parallel, [&]() { left = Filter(x->lch, f); },
+        [&]() { right = Filter(x->rch, f); });
+    x->lch = x->rch = nullptr;
+    if (f(x)) return Join(left, Update(x), right);
+    else return Join(left, right);
   }
 };
 

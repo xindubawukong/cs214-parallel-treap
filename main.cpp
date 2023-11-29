@@ -5,7 +5,7 @@
 #include "pam/pam.h"
 #include "pam/treap.h"
 #include "parlay/parallel.h"
-#include "treap2.h"
+#include "treap.h"
 
 using namespace std;
 
