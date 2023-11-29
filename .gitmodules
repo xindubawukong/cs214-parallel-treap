@@ -4,3 +4,6 @@
 [submodule "PAM"]
 	path = PAM
 	url = git@github.com:cmuparlay/PAM.git
+[submodule "gflags"]
+	path = gflags
+	url = git@github.com:gflags/gflags.git

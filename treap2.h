@@ -10,6 +10,7 @@
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "parlay/utilities.h"
+#include "utils.h"
 
 /*
 struct Info {
@@ -35,7 +36,7 @@ struct KthCmp {
 };
 
 template <typename Info>
-struct Treap2 {
+struct Treap {
   using info_t = Info;
   using key_t = Info::key_t;
 
@@ -54,7 +55,7 @@ struct Treap2 {
   Node* Create() { return allocator::create(); }
 
   Node* root;
-  Treap2() : root(nullptr) {}
+  Treap() : root(nullptr) {}
 
   Node* Update(Node* x) {
     x->Update(x->lch, x->rch);
@@ -115,7 +116,7 @@ struct Treap2 {
   }
 
   auto Split(Node* x, const key_t& key) {
-    return Split(root, [&](Info* t) {
+    return Split(x, [&](Info* t) {
       if (Info::cmp(key, t->key)) return -1;
       if (Info::cmp(t->key, key)) return 1;
       return 0;
@@ -186,16 +187,20 @@ struct Treap2 {
     return less + 1;
   }
 
+  size_t dbg(Node* x) { return x ? x->size : 0; }
+
   Node* Union(Node* x, Node* y) {
     if (!x) return y;
     if (!y) return x;
+    bool parallel = x->size > 100 && y->size > 100;
     auto [t1, t2, t3] = Split(y, x->key);
     Node* left;
     Node* right;
-    parlay::parallel_do([&]() { left = Union(x->lch, t1); },
-                        [&]() { right = Union(x->rch, t3); });
+    conditional_par_do(
+        parallel, [&]() { left = Union(x->lch, t1); },
+        [&]() { right = Union(x->rch, t3); });
     x->lch = x->rch = nullptr;
-    return Join(left, right, Update(x));
+    return Join(left, Update(x), right);
   }
 };
 
