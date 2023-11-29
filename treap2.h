@@ -202,6 +202,35 @@ struct Treap {
     x->lch = x->rch = nullptr;
     return Join(left, Update(x), right);
   }
+
+  Node* Intersect(Node* x, Node* y) {
+    if (!x) return nullptr;
+    if (!y) return nullptr;
+    bool parallel = x->size > 100 && y->size > 100;
+    auto [t1, t2, t3] = Split(y, x->key);
+    Node* left;
+    Node* right;
+    conditional_par_do(
+        parallel, [&]() { left = Intersect(x->lch, t1); },
+        [&]() { right = Intersect(x->rch, t3); });
+    x->lch = x->rch = nullptr;
+    if (t2) return Join(left, Update(x), right);
+    else return Join(left, right);
+  }
+
+  template <typename F>
+  Node* Filter(Node* x, F f) {
+    if (!x) return nullptr;
+    bool parallel = x->size > 100;
+    Node* left;
+    Node* right;
+    conditional_par_do(
+        parallel, [&]() { left = Filter(x->lch, f); },
+        [&]() { right = Filter(x->rch, f); });
+    x->lch = x->rch = nullptr;
+    if (f(x)) return Join(left, Update(x), right);
+    else return Join(left, right);
+  }
 };
 
 #endif  // TREAP2_H_
