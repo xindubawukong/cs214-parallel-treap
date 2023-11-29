@@ -10,9 +10,9 @@ project(
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_compile_options(-DLOCAL)
-
 set(CompileOptions
+-fconcepts
+-pthread
 -DPARLAY_ALLOC_ALLOW_LEAK
 -O3
 # -Wall -Wextra -pedantic

@@ -42,7 +42,7 @@ struct KthCmp {
 template <typename Info>
 struct Treap {
   using info_t = Info;
-  using key_t = Info::key_t;
+  using key_t = typename Info::key_t;
 
   struct Node : public Info {
     size_t priority;
@@ -143,8 +143,11 @@ struct Treap {
     size_t mid = (l + r) / 2;
     Node* x = Create();
     f(mid, x);
-    if (l < mid) x->lch = BuildTree(l, mid - 1, f);
-    if (mid < r) x->rch = BuildTree(mid + 1, r, f);
+    bool parallel = r - l + 1 > 100;
+    conditional_par_do(parallel,
+      [&]() { if (l < mid) x->lch = BuildTree(l, mid - 1, f); },
+      [&]() { if (mid < r) x->rch = BuildTree(mid + 1, r, f); }
+    );
     return Update(x);
   }
 

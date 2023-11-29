@@ -49,6 +49,7 @@ auto Generate(size_t n, size_t kk, size_t vv, size_t seed) {
 void TestUnion(auto a, auto b) {
   cout << "\nTestUnion start, a.size: " << a.size() << ", b.size: " << b.size()
        << endl;
+  parlay::internal::timer tb1;
   using map_t = aug_map<entry, treap<entry>>;
   map_t map1, map2;
   auto replace = [](const auto& a, const auto& b) { return a; };
@@ -56,7 +57,9 @@ void TestUnion(auto a, auto b) {
                                           replace);
   map2 = map_t::Tree::multi_insert_sorted(map2.get_root(), b.data(), b.size(),
                                           replace);
+  cout << "pam build time: " << tb1.stop() << endl;
 
+  parlay::internal::timer tb2;
   Treap<Info> treap1, treap2;
   treap1.root = treap1.BuildTree(0, a.size() - 1, [&](size_t i, Info* info) {
     info->key = a[i].first;
@@ -66,6 +69,7 @@ void TestUnion(auto a, auto b) {
     info->key = b[i].first;
     info->val = b[i].second;
   });
+  cout << "treap build time: " << tb2.stop() << endl;
 
   parlay::internal::timer t1;
   map1 = map_t::map_union(map1, map2, replace);
@@ -154,16 +158,10 @@ void TestFilter(auto a) {
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  // using map_t = aug_map<entry, treap<entry>>;
-  // map_t a;
-  // vector<pair<int, long long>> b = {{1, 2}, {3, 4}, {5, 6}};
-  // auto replace = [](const auto& a, const auto& b) { return b; };
-  // a = map_t::Tree::multi_insert_sorted(a.get_root(), b.data(), b.size(),
-  //                                      replace);
-  // cout << a.aug_val() << endl;
+  size_t n = 1200000000;
 
-  auto a = Generate(1000000, 3000000, 1000000000, 1);
-  auto b = Generate(1000000, 3000000, 1000000000, 2);
+  auto a = Generate(n, 3 * n, 100000000000ull, 1);
+  auto b = Generate(n, 3 * n, 100000000000ull, 2);
 
   parlay::sort_inplace(a);
   parlay::sort_inplace(b);
