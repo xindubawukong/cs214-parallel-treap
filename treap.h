@@ -201,6 +201,7 @@ struct Treap {
     if (!y) return x;
     bool parallel = x->size > 100 && y->size > 100;
     auto [t1, t2, t3] = Split(y, x->key);
+    if (t2) allocator::free(t2);
     Node* left;
     Node* right;
     conditional_par_do(
@@ -211,8 +212,14 @@ struct Treap {
   }
 
   Node* Intersect(Node* x, Node* y) {
-    if (!x) return nullptr;
-    if (!y) return nullptr;
+    if (!x) {
+      GC(y);
+      return nullptr;
+    }
+    if (!y) {
+      GC(x);
+      return nullptr;
+    }
     bool parallel = x->size > 100 && y->size > 100;
     auto [t1, t2, t3] = Split(y, x->key);
     Node* left;
@@ -221,8 +228,14 @@ struct Treap {
         parallel, [&]() { left = Intersect(x->lch, t1); },
         [&]() { right = Intersect(x->rch, t3); });
     x->lch = x->rch = nullptr;
-    if (t2) return Join(left, Update(x), right);
-    else return Join(left, right);
+    if (t2) {
+      allocator::free(t2);
+      return Join(left, Update(x), right);
+    }
+    else {
+      allocator::free(x);
+      return Join(left, right);
+    }
   }
 
   template <typename F>
@@ -237,6 +250,16 @@ struct Treap {
     x->lch = x->rch = nullptr;
     if (f(x)) return Join(left, Update(x), right);
     else return Join(left, right);
+  }
+
+  void GC(Node* x) {
+    if (!x) return;
+    bool parallel = x->size > 100;
+    conditional_par_do(parallel,
+    [&]() {GC(x->lch);},
+      [&]() {GC(x->rch);}
+    );
+    allocator::free(x);
   }
 };
 

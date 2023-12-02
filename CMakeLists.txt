@@ -11,9 +11,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CompileOptions
--fconcepts
 -pthread
--DPARLAY_ALLOC_ALLOW_LEAK
+# -DPARLAY_ALLOC_ALLOW_LEAK
 -O3
 # -Wall -Wextra -pedantic
 # -Wshadow -Wformat=2 -Wfloat-equal -Wcast-qual -Wcast-align

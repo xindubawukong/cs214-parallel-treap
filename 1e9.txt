@@ -1,0 +1,28 @@
+TestUnion start, a.size: 1020488579, b.size: 1020480866
+pam build time: 11.7012
+treap build time: 11.4768
+TestUnion result: true
+pam build time: 6.29085
+treap build time: 5.15102
+TestUnion result: true
+pam build time: 6.31933
+treap build time: 13.9041
+TestUnion result: true
+pam build time: 8.9833
+treap build time: 6.58164
+TestUnion result: true
+Union avg time: 14.523 8.45526
+
+TestIntersect start, a.size: 1020488579, b.size: 1020480866
+TestIntersect result: true
+TestIntersect result: true
+TestIntersect result: true
+TestIntersect result: true
+Intersect avg time: 15.1927 10.2734
+
+TestFilter start, a.size: 1020488579
+TestFilter result: true
+TestFilter result: true
+TestFilter result: true
+TestFilter result: true
+Filter avg time: 7.56437 2.77101
