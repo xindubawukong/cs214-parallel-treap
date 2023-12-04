@@ -16,3 +16,5 @@ $ cmake ..
 $ make
 $ ./main
 ```
+
+You may need to add a line `#include "parlay/parallel.h"` into `PAM/include/pam/utils.h`.
